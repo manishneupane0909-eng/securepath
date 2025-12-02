@@ -1,0 +1,53 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-cyber-dark text-cyber-text-primary font-sans antialiased overflow-hidden;
+    background-image: 
+      radial-gradient(circle at 10% 20%, rgba(112, 0, 255, 0.1) 0%, transparent 40%),
+      radial-gradient(circle at 90% 80%, rgba(0, 240, 255, 0.1) 0%, transparent 40%);
+  }
+}
+
+@layer components {
+  .glass-panel {
+    @apply bg-glass-gradient backdrop-blur-xl border border-white/10 shadow-glass rounded-xl;
+  }
+  
+  .glass-panel-hover {
+    @apply hover:border-cyber-primary/50 hover:shadow-neon-cyan transition-all duration-300;
+  }
+
+  .cyber-button {
+    @apply bg-cyber-primary/10 border border-cyber-primary/50 text-cyber-primary 
+           hover:bg-cyber-primary hover:text-black font-bold py-2 px-4 rounded-lg 
+           transition-all duration-300 shadow-neon-cyan uppercase tracking-wider text-sm;
+  }
+
+  .cyber-input {
+    @apply bg-black/20 border border-white/10 rounded-lg px-4 py-2 text-white 
+           focus:border-cyber-primary focus:ring-1 focus:ring-cyber-primary outline-none transition-all;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #05050A;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1F2937;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #374151;
+}

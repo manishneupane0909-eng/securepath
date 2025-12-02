@@ -1,0 +1,109 @@
+/* src/App.css */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+:root {
+  --primary: #2563eb;
+  --primary-dark: #1e40af;
+  --bg-color: #f3f4f6;
+  --card-bg: #ffffff;
+  --text-main: #111827;
+  --text-muted: #6b7280;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+  --success: #10b981;
+  --border: #e5e7eb;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-main);
+  -webkit-font-smoothing: antialiased;
+}
+
+.app-layout {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+/* --- HEADER --- */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2.5rem;
+  background: var(--card-bg);
+  padding: 1.5rem 2rem;
+  border-radius: 16px;
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+}
+.brand h1 { font-size: 1.8rem; font-weight: 800; margin: 0; letter-spacing: -0.5px; }
+.brand span { color: var(--primary); }
+.atp-badge { background: #dbeafe; color: #1e40af; padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; }
+
+/* --- UPLOAD AREA (ATC-01) --- */
+.upload-zone {
+  background: var(--card-bg);
+  border: 2px dashed var(--border);
+  border-radius: 12px;
+  padding: 3rem;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 2rem;
+}
+.upload-zone:hover { border-color: var(--primary); background: #eff6ff; }
+.upload-btn { background: var(--primary); color: white; padding: 10px 24px; border-radius: 8px; border: none; font-weight: 600; cursor: pointer; margin-top: 1rem; }
+
+/* --- METRICS GRID (ATC-05) --- */
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+.card { background: var(--card-bg); padding: 1.5rem; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); position: relative; overflow: hidden; }
+.card h3 { color: var(--text-muted); font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.5px; margin: 0 0 0.5rem 0; }
+.card .value { font-size: 2.25rem; font-weight: 700; margin: 0; }
+.card.danger { border-bottom: 4px solid var(--danger); }
+.card.warning { border-bottom: 4px solid var(--warning); }
+.card.success { border-bottom: 4px solid var(--success); }
+
+/* --- HEATMAP (ATC-05) --- */
+.heatmap-bar { display: flex; height: 12px; border-radius: 6px; overflow: hidden; margin-top: 1rem; }
+.segment { height: 100%; }
+
+/* --- TABLE (ATC-06) --- */
+.table-wrapper { background: var(--card-bg); border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); overflow: hidden; }
+.table-header { padding: 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; padding: 1rem 1.5rem; background: #f9fafb; font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600; }
+td { padding: 1rem 1.5rem; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+tr:last-child td { border-bottom: none; }
+
+/* Badges & Buttons */
+.status-badge { padding: 4px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 700; }
+.bg-red { background: #fee2e2; color: #991b1b; }
+.bg-yellow { background: #fef3c7; color: #92400e; }
+.bg-green { background: #d1fae5; color: #065f46; }
+
+.action-btn { padding: 6px 12px; border-radius: 6px; border: none; cursor: pointer; font-size: 0.8rem; font-weight: 600; margin-right: 8px; transition: opacity 0.2s; }
+.btn-approve { background: #dcfce7; color: #166534; }
+.btn-reject { background: #fee2e2; color: #991b1b; }
+.action-btn:hover { opacity: 0.8; }
+
+/* --- OFFLINE BANNER (ATC-09) --- */
+.offline-banner {
+  background: #fff7ed;
+  border: 1px solid #ffedd5;
+  color: #9a3412;
+  padding: 1rem;
+  margin-bottom: 2rem;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  font-weight: 500;
+}

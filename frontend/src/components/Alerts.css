@@ -1,0 +1,19 @@
+.alerts {
+  padding: 2rem;
+}
+.alert {
+  background: var(--card);
+  padding: 1em;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  box-shadow: 0 4px 11px #b1c3de44;
+}
+.danger {
+  color: #e62429;
+  font-weight: bold;
+  border-left: 6px solid #e62429;
+}
+.warning {
+  color: #ffa500;
+  border-left: 6px solid #ffa500;
+}

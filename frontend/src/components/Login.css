@@ -1,0 +1,39 @@
+.login {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: linear-gradient(120deg, #b9d3ff 50%, #3e95cd 100%);
+}
+.login form {
+  background: var(--card);
+  padding: 3em 2em;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px #b1c3de44;
+  display: flex;
+  flex-direction: column;
+  gap: 1.2em;
+  min-width: 300px;
+}
+input, select {
+  padding: 0.8em 1em;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 1em;
+}
+button {
+  background: #3e95cd;
+  color: #fff;
+  border: none;
+  padding: 0.9em 1.5em;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 1em;
+  cursor: pointer;
+  margin-top: 1em;
+  transition: background 0.2s;
+}
+button:hover {
+  background: #232c3d;
+  color: #ffd600;
+}
