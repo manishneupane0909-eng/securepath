@@ -1,5 +1,7 @@
 # SecurePath
 
+**Full-stack monorepo** - This is the main repository containing both backend and frontend.
+
 Full-stack fraud detection system I built for a class project. Uses Django for the backend and React for the frontend. Integrates with Plaid to get transaction data and runs ML models to detect fraud.
 
 ## What it does
