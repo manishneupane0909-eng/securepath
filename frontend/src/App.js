@@ -1,4 +1,3 @@
-// src/App-Refactored.js - Refactored main App component
 import React, { useState } from 'react';
 import ErrorBoundary from './components/ErrorBoundary';
 import Sidebar from './components/Shared/Sidebar';
@@ -9,9 +8,6 @@ import AuditLogView from './components/AuditLog/AuditLogView';
 import ReportsView from './components/Reports/ReportsView';
 import { useDashboardData } from './hooks/useDashboardData';
 import { NAV_ITEMS } from './config/constants';
-import { Droplets, TestTube } from 'lucide-react';
-
-// Simple placeholder components
 
 
 

@@ -1,4 +1,4 @@
-// src/components/AuditLog/AuditLogView.js - Audit log component
+
 import React from 'react';
 import { FileText, RefreshCw, Clock, User, Activity } from 'lucide-react';
 import { useAuditLogs } from '../../hooks/useAuditLogs';

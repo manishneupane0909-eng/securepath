@@ -1,4 +1,4 @@
-// src/components/Shared/Sidebar.js - Reusable sidebar component
+
 import React from 'react';
 import { NAV_ITEMS, ROUTES } from '../../config/constants';
 import {

@@ -1,4 +1,4 @@
-// src/components/Dashboard/DashboardView.js - Dashboard component
+
 import React from 'react';
 import {
     Activity, Clock, AlertTriangle, DollarSign, TrendingUp,

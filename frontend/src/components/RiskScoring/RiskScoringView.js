@@ -1,4 +1,4 @@
-// src/components/RiskScoring/RiskScoringView.js - Risk scoring component
+
 import React, { useState } from 'react';
 import { AlertTriangle, Loader, ShieldAlert, Activity } from 'lucide-react';
 import apiService from '../../services/api';
