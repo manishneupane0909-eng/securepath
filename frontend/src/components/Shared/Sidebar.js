@@ -3,7 +3,7 @@ import React from 'react';
 import { NAV_ITEMS, ROUTES } from '../../config/constants';
 import {
     Shield, LayoutDashboard, Upload, Droplets,
-    AlertTriangle, FileText, FileBarChart
+    AlertTriangle, FileText, FileBarChart, User
 } from 'lucide-react';
 
 const ICON_MAP = {
@@ -13,6 +13,7 @@ const ICON_MAP = {
     [ROUTES.RISK_SCORING]: AlertTriangle,
     [ROUTES.AUDIT_LOG]: FileText,
     [ROUTES.REPORTS]: FileBarChart,
+    [ROUTES.PROFILE]: User,
 };
 
 export default function Sidebar({ activeTab, setActiveTab, sidebarOpen, setSidebarOpen }) {

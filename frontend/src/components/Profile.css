@@ -1,6 +1,7 @@
 .profile {
   padding: 2rem;
 }
+
 .profile-card {
   background: var(--card);
   padding: 1.5em 2em;
@@ -8,6 +9,84 @@
   box-shadow: 0 6px 16px #b1c3de44;
   max-width: 400px;
 }
+
+.profile-edit-container {
+  padding: 2rem;
+  display: flex;
+  justify-content: center;
+}
+
+.profile-edit-form {
+  background: #fff;
+  padding: 2rem;
+  border-radius: 18px;
+  box-shadow: 0 6px 16px #b1c3de44;
+  max-width: 480px;
+  width: 100%;
+}
+
+.profile-edit-image-container {
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+.profile-edit-image {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid #ddd;
+}
+
+.profile-image-text {
+  font-size: 0.9rem;
+  margin-top: 6px;
+  color: #3e95cd;
+}
+
+.profile-edit-field {
+  margin-bottom: 1rem;
+}
+
+.profile-edit-field label {
+  display: block;
+  margin-bottom: 0.3rem;
+  font-weight: bold;
+}
+
+.profile-edit-field input {
+  width: 100%;
+  padding: 0.7rem;
+  border-radius: 10px;
+  border: 1px solid #ccc;
+}
+
+.profile-save-button {
+  width: 100%;
+  padding: 0.9rem;
+  background: #3e95cd;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 1.1rem;
+  margin-top: 1rem;
+  cursor: pointer;
+}
+
+.profile-save-button:hover {
+  background: #2c6fa0;
+}
+
+.profile-save-success {
+  margin-top: 1rem;
+  padding: 0.7rem;
+  background: #d8f7d3;
+  color: #227c34;
+  text-align: center;
+  border-radius: 8px;
+  font-weight: bold;
+}
+
 button {
   background: #3e95cd;
   color: #fff;
@@ -20,6 +99,7 @@ button {
   margin-top: 1em;
   transition: background 0.2s;
 }
+
 button:hover {
   background: #232c3d;
   color: #ffd600;

@@ -23,6 +23,7 @@ export const ROUTES = {
     RISK_SCORING: 'risk-scoring',
     AUDIT_LOG: 'audit-log',
     REPORTS: 'reports',
+    PROFILE: 'profile',
 };
 
 export const NAV_ITEMS = [
@@ -31,4 +32,5 @@ export const NAV_ITEMS = [
     { id: ROUTES.RISK_SCORING, label: 'Risk Scoring', color: 'orange' },
     { id: ROUTES.AUDIT_LOG, label: 'Audit Log', color: 'purple' },
     { id: ROUTES.REPORTS, label: 'Report Export', color: 'indigo' },
+    { id: ROUTES.PROFILE, label: 'Profile', color: 'pink' },
 ];
