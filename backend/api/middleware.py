@@ -1,4 +1,3 @@
-# api/middleware.py - Custom middleware for error handling and logging
 import logging
 import time
 import json
