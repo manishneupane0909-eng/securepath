@@ -1,6 +1,6 @@
 # SecurePath
 
-**Full-stack monorepo** - This is the main repository containing both backend and frontend.
+Full-stack monorepo - This is the main repository containing both backend and frontend.
 
 Full-stack fraud detection system I built for a class project. Uses Django for the backend and React for the frontend. Integrates with Plaid to get transaction data and runs ML models to detect fraud.
 
@@ -13,14 +13,14 @@ Full-stack fraud detection system I built for a class project. Uses Django for t
 
 ## Tech Stack
 
-**Backend:**
+Backend:
 - Django REST Framework
 - PostgreSQL (or SQLite for dev)
 - scikit-learn for ML models
 - Celery + Redis for background tasks
 - Plaid API integration
 
-**Frontend:**
+Frontend:
 - React
 - TailwindCSS
 - Chart.js for visualizations
@@ -35,13 +35,8 @@ python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 
-# Copy .env.example to .env and fill in your keys
 cp .env.example .env
-
-# Run migrations
 python manage.py migrate
-
-# Start server
 python manage.py runserver
 ```
 
@@ -51,10 +46,7 @@ python manage.py runserver
 cd frontend
 npm install
 
-# Copy .env.example to .env.local
 cp .env.example .env.local
-
-# Start dev server
 npm start
 ```
 
