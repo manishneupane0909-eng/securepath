@@ -1,4 +1,3 @@
-// src/services/api.js - Centralized API service layer
 import { API_CONFIG } from '../config/constants';
 
 class APIError extends Error {
@@ -10,9 +9,6 @@ class APIError extends Error {
     }
 }
 
-/**
- * Base API call function with error handling
- */
 const apiCall = async (endpoint, options = {}) => {
     const url = `${API_CONFIG.BASE_URL}${endpoint}`;
 
@@ -52,11 +48,7 @@ const apiCall = async (endpoint, options = {}) => {
     }
 };
 
-/**
- * API Service object with all endpoints
- */
 export const apiService = {
-    // Dashboard endpoints
     getStats: () => apiCall('/dashboard/stats'),
 
     getTransactions: (page = 1, pageSize = 10, statusFilter = null) => {
@@ -65,16 +57,12 @@ export const apiService = {
         return apiCall(`/dashboard/transactions?${params}`);
     },
 
-    // Audit log
     getAuditLogs: (page = 1, pageSize = 20) => {
         const params = new URLSearchParams({ page, page_size: pageSize });
         return apiCall(`/audit-log?${params}`);
     },
 
-    // Fraud detection
     detectFraud: () => apiCall('/detect-fraud', { method: 'POST' }),
-
-    // File upload
     uploadFile: (file) => {
         const formData = new FormData();
         formData.append('file', file);
@@ -104,12 +92,10 @@ export const apiService = {
         });
     },
 
-    // Export reports
     async getExportUrl(type) {
         return `${API_CONFIG.BASE_URL}/export/${type}?token=${API_CONFIG.AUTH_TOKEN}`;
     },
 
-    // Plaid Integration
     async createLinkToken() {
         return apiCall('/plaid/link-token');
     },
@@ -128,7 +114,6 @@ export const apiService = {
         return apiCall(`/plaid/transactions?access_token=${accessToken}`);
     },
 
-    // API testing
     async testEndpoint(endpoint, method = 'GET') {
         return apiCall(endpoint, { method });
     },

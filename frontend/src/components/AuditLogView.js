@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { FileText, Loader } from 'lucide-react';
-// Assuming api.js is in the root of 'src' or at '../api' relative to this component
 import api from '../api';
 
 export default function AuditLogView() {
@@ -16,8 +15,6 @@ export default function AuditLogView() {
     setLoading(true);
     setError(null);
     try {
-      // NOTE: We assume the backend is sending the Authorization header correctly
-      // as part of the global Axios configuration or interceptor.
       const response = await api.get('/audit-log');
       setLogs(response.data.logs || []);
     } catch (err) {

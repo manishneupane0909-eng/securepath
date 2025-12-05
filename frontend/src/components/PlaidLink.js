@@ -5,7 +5,7 @@ import { Loader, CheckCircle, AlertCircle, Shield } from 'lucide-react';
 
 export default function PlaidLink({ onSuccess }) {
   const [token, setToken] = useState(null);
-  const [status, setStatus] = useState("loading"); // "loading", "ready", "success", "error"
+  const [status, setStatus] = useState("loading");
   const [error, setError] = useState(null);
 
   useEffect(() => {

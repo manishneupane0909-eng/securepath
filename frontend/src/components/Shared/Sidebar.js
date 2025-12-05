@@ -26,7 +26,6 @@ export default function Sidebar({ activeTab, setActiveTab, sidebarOpen, setSideb
                 flex flex-col overflow-hidden
             `}
         >
-            {/* Logo Area */}
             <div className="p-6 flex items-center gap-3 border-b border-white/10 relative overflow-hidden group">
                 <div className="absolute inset-0 bg-cyber-primary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
                 <div className="relative z-10 p-2 bg-cyber-primary/10 rounded-lg border border-cyber-primary/30 shadow-neon-cyan">
@@ -41,7 +40,6 @@ export default function Sidebar({ activeTab, setActiveTab, sidebarOpen, setSideb
                 </div>
             </div>
 
-            {/* Navigation */}
             <nav className="flex-1 py-6 px-3 space-y-2 overflow-y-auto custom-scrollbar">
                 {NAV_ITEMS.map((item) => {
                     const Icon = ICON_MAP[item.id] || Shield;
@@ -80,7 +78,6 @@ export default function Sidebar({ activeTab, setActiveTab, sidebarOpen, setSideb
                 })}
             </nav>
 
-            {/* Footer / Toggle */}
             <div className="p-4 border-t border-white/10">
                 <button
                     onClick={() => setSidebarOpen(!sidebarOpen)}

@@ -45,7 +45,6 @@ export default function UploadView({ onSuccess }) {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {/* Option 1: CSV Upload */}
                 <div className="glass-panel p-8 relative overflow-hidden group hover:border-cyber-primary/50 transition-all duration-300">
                     <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
                         <Database size={100} />
@@ -100,7 +99,6 @@ export default function UploadView({ onSuccess }) {
                     </div>
                 </div>
 
-                {/* Option 2: Plaid Integration */}
                 <div className="glass-panel p-8 relative overflow-hidden group hover:border-cyber-secondary/50 transition-all duration-300">
                     <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
                         <Shield size={100} />

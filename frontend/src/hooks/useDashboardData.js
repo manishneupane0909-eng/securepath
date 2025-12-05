@@ -1,4 +1,3 @@
-// src/hooks/useDashboardData.js - Custom hook for dashboard data
 import { useState, useEffect, useCallback } from 'react';
 import apiService from '../services/api';
 

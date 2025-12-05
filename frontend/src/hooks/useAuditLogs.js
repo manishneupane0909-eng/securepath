@@ -1,4 +1,3 @@
-// src/hooks/useAuditLogs.js - Custom hook for audit logs
 import { useState, useEffect, useCallback } from 'react';
 import apiService from '../services/api';
 

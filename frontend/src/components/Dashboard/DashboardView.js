@@ -32,7 +32,6 @@ export default function DashboardView({ stats, transactions, loading, onRefresh 
 
     return (
         <div className="space-y-6">
-            {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {statCards.map((stat, i) => {
                     const Icon = stat.icon;
@@ -53,7 +52,6 @@ export default function DashboardView({ stats, transactions, loading, onRefresh 
                 })}
             </div>
 
-            {/* Recent Transactions Table */}
             <div className="glass-panel overflow-hidden">
                 <div className="p-6 border-b border-white/10 flex justify-between items-center bg-white/5">
                     <h3 className="text-lg font-bold text-white tracking-wide flex items-center gap-2">

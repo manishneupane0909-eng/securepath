@@ -65,7 +65,6 @@ export default function SecurePathDashboard() {
                     setSidebarOpen={setSidebarOpen}
                 />
 
-                {/* Main Content - Adjusted margin for floating sidebar */}
                 <main
                     className={`
                         flex-1 transition-all duration-300 ease-in-out
@@ -74,7 +73,6 @@ export default function SecurePathDashboard() {
                         h-[calc(100vh-2rem)] overflow-y-auto custom-scrollbar rounded-xl
                     `}
                 >
-                    {/* Top Bar - Glass Effect */}
                     <header className="glass-panel mb-6 p-6 sticky top-4 z-40 flex items-center justify-between">
                         <div>
                             <h2 className="text-3xl font-bold text-white tracking-tight flex items-center gap-3">
@@ -99,7 +97,6 @@ export default function SecurePathDashboard() {
                         </div>
                     </header>
 
-                    {/* Content Area */}
                     <div className="animate-float">
                         {renderContent()}
                     </div>
