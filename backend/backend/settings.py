@@ -137,7 +137,7 @@ CORS_ALLOW_HEADERS = [
 # API SETTINGS
 # =====================================================
 
-API_TOKEN = os.getenv('API_TOKEN', 'securepath2025')
+API_TOKEN = os.getenv('API_TOKEN', 'root')
 
 # =====================================================
 # FILE UPLOAD SETTINGS (Updated for 400 MB)
