@@ -1,4 +1,4 @@
-
+// src/components/Reports/ReportsView.js - Reports component
 import React, { useState } from 'react';
 import { Shield, Loader } from 'lucide-react';
 import apiService from '../../services/api';

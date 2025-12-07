@@ -1,12 +1,15 @@
-# api/auth.py - Uses settings.API_TOKEN for consistent token management
+# api/auth.py - DEV ONLY: Accepts token 'root'
 from ninja.security import HttpBearer
-from django.conf import settings
+from django.conf import settings  # NEW: Import settings
+import os
+
+# Get the API token from environment variables or use a fallback
+API_TOKEN = os.getenv('API_TOKEN', 'root')
 
 
 class AuthBearer(HttpBearer):
     def authenticate(self, request, token):
-        # Use settings.API_TOKEN for consistent token validation
-        if token == settings.API_TOKEN:
+        if token == API_TOKEN:
             return token
         return None
 

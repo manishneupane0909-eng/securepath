@@ -1,0 +1,59 @@
+# ===========================
+# Backend Environment Variables
+# ===========================
+
+# Django Settings
+SECRET_KEY=your-secret-key-change-this-to-a-random-string
+DEBUG=True
+DJANGO_ENV=development
+ALLOWED_HOSTS=localhost,127.0.0.1
+
+# Database Configuration
+# For development, use SQLite:
+DB_ENGINE=django.db.backends.sqlite3
+DB_NAME=db.sqlite3
+
+# For production, use PostgreSQL:
+# DB_ENGINE=django.db.backends.postgresql
+# DB_NAME=securepath_db
+# DB_USER=securepath_user
+# DB_PASSWORD=your_secure_password
+# DB_HOST=localhost
+# DB_PORT=5432
+
+# API Configuration
+API_TOKEN=your-secure-api-token-change-this
+
+# Plaid Configuration
+# Get your keys from https://dashboard.plaid.com/
+PLAID_CLIENT_ID=your_plaid_client_id
+PLAID_SECRET=your_plaid_secret_sandbox
+PLAID_ENV=sandbox  # Options: sandbox, development, production
+
+# Celery Configuration (Optional)
+CELERY_BROKER_URL=redis://localhost:6379/0
+CELERY_RESULT_BACKEND=redis://localhost:6379/0
+
+# Email Configuration (Optional)
+EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend
+# For production:
+# EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
+# EMAIL_HOST=smtp.gmail.com
+# EMAIL_PORT=587
+# EMAIL_USE_TLS=True
+# EMAIL_HOST_USER=your-email@gmail.com
+# EMAIL_HOST_PASSWORD=your-app-password
+
+# ===========================
+# Frontend Environment Variables
+# ===========================
+
+# API Configuration
+REACT_APP_API_BASE_URL=http://localhost:8000/api
+REACT_APP_API_TOKEN=your-secure-api-token-change-this
+
+# Plaid Configuration
+REACT_APP_PLAID_ENV=sandbox
+
+# Optional: Analytics
+# REACT_APP_GA_TRACKING_ID=UA-XXXXXXXXX-X

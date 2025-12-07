@@ -1,4 +1,4 @@
-
+// src/components/ErrorBoundary.js - Error boundary component
 import React from 'react';
 import { AlertTriangle } from 'lucide-react';
 

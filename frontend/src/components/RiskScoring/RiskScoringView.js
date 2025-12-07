@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { AlertTriangle, Loader, ShieldAlert, Activity } from 'lucide-react';
 import apiService from '../../services/api';
@@ -25,7 +24,6 @@ export default function RiskScoringView({ onComplete }) {
     return (
         <div className="max-w-4xl mx-auto">
             <div className="glass-panel p-8 relative overflow-hidden">
-                {/* Background Effects */}
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-96 bg-cyber-accent/10 rounded-full blur-[100px] pointer-events-none"></div>
 
                 <div className="text-center mb-10 relative z-10">

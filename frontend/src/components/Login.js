@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-const logoURL = "/logo.png";
+const logoURL = "/logo.png";  // In /public
 
 function Login({ onLogin }) {
   const [email, setEmail] = useState("");
@@ -18,10 +18,11 @@ function Login({ onLogin }) {
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      background: "#0a0a0d",
+      background: "#0a0a0d",  // Stylish black
       position: "relative",
       overflow: "hidden"
     }}>
+      {/* Large, bright logo as a centered fixed BG */}
       <img
         src={logoURL}
         alt="Company Logo"
@@ -39,8 +40,9 @@ function Login({ onLogin }) {
           filter: "drop-shadow(0 2px 32px #13131eee)"
         }}
       />
+      {/* Semi-transparent login card */}
       <form onSubmit={handleSubmit} style={{
-        background: "rgba(34,37,48,0.62)",
+        background: "rgba(34,37,48,0.62)", // <--- Slightly bluish, tunable, use "rgba(255,255,255,0.13)" for white-glass
         borderRadius: "18px",
         width: "100%",
         maxWidth: "360px",
@@ -51,7 +53,7 @@ function Login({ onLogin }) {
         padding: "2.7em 2.2em",
         boxSizing: "border-box",
         zIndex: 1,
-        backdropFilter: "blur(6px) saturate(160%)",
+        backdropFilter: "blur(6px) saturate(160%)", // glassmorphism!
         color: "#fff"
       }}>
         <h2 style={{ marginBottom: ".8em", letterSpacing: "-1px", color: "#fff" }}>Sign In</h2>
@@ -97,6 +99,7 @@ function Login({ onLogin }) {
   );
 }
 
+// Glassy field style
 const inputStyle = {
   padding: "0.8em",
   borderRadius: "6px",

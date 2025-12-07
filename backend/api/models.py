@@ -1,3 +1,9 @@
+# api/models.py - COMPLETE VERSION
+"""
+LOCATION: securepath-backend/api/models.py
+Replace your entire models.py with this
+"""
+
 from django.db import models
 from django.utils import timezone
 

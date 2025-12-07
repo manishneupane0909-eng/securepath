@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import ErrorBoundary from './components/ErrorBoundary';
 import Sidebar from './components/Shared/Sidebar';
 import DashboardView from './components/Dashboard/DashboardView';
@@ -6,10 +6,9 @@ import UploadView from './components/Upload/UploadView';
 import RiskScoringView from './components/RiskScoring/RiskScoringView';
 import AuditLogView from './components/AuditLog/AuditLogView';
 import ReportsView from './components/Reports/ReportsView';
-import Profile from './components/Profile';
-import ProfileSetup from './components/ProfileSetup';
 import { useDashboardData } from './hooks/useDashboardData';
-import { NAV_ITEMS, ROUTES } from './config/constants';
+import { NAV_ITEMS } from './config/constants';
+import { Droplets, TestTube } from 'lucide-react';
 
 
 
@@ -17,18 +16,7 @@ import { NAV_ITEMS, ROUTES } from './config/constants';
 export default function SecurePathDashboard() {
     const [activeTab, setActiveTab] = useState('dashboard');
     const [sidebarOpen, setSidebarOpen] = useState(true);
-    const [profileComplete, setProfileComplete] = useState(false);
     const { stats, transactions, loading, refresh } = useDashboardData();
-
-    useEffect(() => {
-        const completed = localStorage.getItem('profileCompleted') === 'true';
-        setProfileComplete(completed);
-    }, []);
-
-    const handleProfileComplete = () => {
-        setProfileComplete(true);
-        localStorage.setItem('profileCompleted', 'true');
-    };
 
     const renderContent = () => {
         switch (activeTab) {
@@ -42,8 +30,6 @@ export default function SecurePathDashboard() {
                 return <AuditLogView />;
             case 'reports':
                 return <ReportsView />;
-            case 'profile':
-                return <Profile role="user" />;
             default:
                 return <DashboardView stats={stats} transactions={transactions} loading={loading} onRefresh={refresh} />;
         }
@@ -53,10 +39,6 @@ export default function SecurePathDashboard() {
 
     return (
         <ErrorBoundary>
-            {!profileComplete && (
-                <ProfileSetup onComplete={handleProfileComplete} />
-            )}
-
             <div className="flex min-h-screen bg-cyber-dark text-cyber-text-primary selection:bg-cyber-primary selection:text-black">
                 <Sidebar
                     activeTab={activeTab}

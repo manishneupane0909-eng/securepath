@@ -29,7 +29,6 @@ export default function PlaidLink({ onSuccess }) {
       setStatus("loading");
       try {
         const data = await apiService.exchangePublicToken(public_token);
-        // After exchange, fetch transactions
         await apiService.getPlaidTransactions(data.access_token);
         setStatus("success");
         if (onSuccess) onSuccess();

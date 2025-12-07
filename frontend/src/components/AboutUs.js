@@ -1,5 +1,6 @@
 import React from 'react';
 
+// Emoji for icons—can replace with SVGs for even more polish!
 const AboutUs = () => (
   <section style={{
     display: "flex",
@@ -8,6 +9,7 @@ const AboutUs = () => (
     justifyContent: "center",
     padding: "2em 0"
   }}>
+    {/* About Us Card */}
     <div style={{
       background: "#fff",
       borderRadius: "18px",
@@ -26,6 +28,7 @@ const AboutUs = () => (
       </p>
     </div>
 
+    {/* What We Do Card */}
     <div style={{
       background: "#f9fafb",
       borderRadius: "18px",
@@ -44,6 +47,7 @@ const AboutUs = () => (
       </p>
     </div>
 
+    {/* How We Help You Card */}
     <div style={{
       background: "#fff",
       borderRadius: "18px",

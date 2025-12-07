@@ -1,3 +1,4 @@
+# api/router.py - COMPLETE FINAL VERSION (Optimized for Speed)
 from ninja import Router, File, UploadedFile
 from api.auth import auth_bearer, token_query_auth
 import pandas as pd
