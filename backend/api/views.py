@@ -1,4 +1,4 @@
-# api/views.py - FRONTEND INTEGRATION VERSION
+# api/views.py
 from ninja import NinjaAPI, UploadedFile
 from django.http import HttpResponse
 from django.utils import timezone
@@ -131,7 +131,7 @@ def list_transactions(request):
             "date": t.date.strftime("%Y-%m-%d %H:%M"),
             "country": t.country,
 
-            # CRITICAL: Convert 0.9 -> 90 so your Dashboard turns RED
+            # Convert 0.9 -> 90 for dashboard display
             "risk_score": int(t.fraud_score * 100),
 
             "status": "Review Needed" if t.is_fraud else "Approved",

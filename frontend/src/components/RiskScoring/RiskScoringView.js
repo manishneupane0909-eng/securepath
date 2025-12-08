@@ -11,11 +11,27 @@ export default function RiskScoringView({ onComplete }) {
         setResult(null);
 
         try {
+            console.log('Starting fraud detection...');
             const data = await apiService.detectFraud();
-            setResult(data);
+            console.log('Fraud detection response:', data);
+            
+            // Ensure we have the expected format
+            const result = {
+                status: data.status || 'success',
+                message: data.message || `Processed ${data.transactions_processed || 0} transactions`,
+                transactions_processed: data.transactions_processed || data.processed || 0,
+                fraud_detected: data.fraud_detected || data.flagged || 0,
+                duration_seconds: data.duration_seconds || 0
+            };
+            
+            setResult(result);
             if (onComplete) onComplete();
         } catch (error) {
-            setResult({ status: 'error', message: error.message });
+            console.error('Fraud detection error:', error);
+            setResult({ 
+                status: 'error', 
+                message: error.message || error.data?.message || 'Fraud detection failed. Please check console for details.' 
+            });
         } finally {
             setRunning(false);
         }

@@ -1,5 +1,6 @@
 # api/schemas.py
 from ninja import Schema
+from pydantic import EmailStr, Field
 
 class UploadResponse(Schema):
     status: str
@@ -40,3 +41,28 @@ class FraudDetectionResult(Schema):
     flagged_count: int
     duration_seconds: float
     results: list
+
+class PlaidExchangeRequest(Schema):
+    public_token: str
+
+# Authentication Schemas
+class UserRegister(Schema):
+    email: EmailStr
+    password: str = Field(..., min_length=8)
+    confirm_password: str = Field(..., min_length=8)
+
+class UserLogin(Schema):
+    email: EmailStr
+    password: str
+
+class UserResponse(Schema):
+    id: int
+    email: str
+    is_active: bool
+    created_at: str
+
+class TokenResponse(Schema):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+    user: UserResponse

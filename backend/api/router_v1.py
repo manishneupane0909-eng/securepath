@@ -1,4 +1,4 @@
-# api/router_v1.py - Versioned API router with rate limiting
+# api/router_v1.py
 from ninja import Router, File, UploadedFile
 from django_ratelimit.decorators import ratelimit
 from django.views.decorators.cache import cache_page
@@ -12,7 +12,15 @@ from django.utils import timezone
 from decimal import Decimal
 import logging
 
-from api.models import Transaction, SystemMetrics, AuditLog
+from api.models import Transaction, SystemMetrics, AuditLog, User, OAuthAccount, RefreshToken
+from api.jwt_auth import (
+    verify_password, get_password_hash, create_access_token, 
+    create_refresh_token, verify_token
+)
+from django.db import IntegrityError
+from django.http import JsonResponse
+from pydantic import EmailStr, Field
+from typing import Optional
 
 logger = logging.getLogger('api')
 router = Router()
@@ -31,11 +39,18 @@ def status(request):
 
 @router.get("/dashboard/stats", auth=auth_bearer)
 def stats(request):
-    """Returns high-level statistics with caching"""
+    """Returns high-level statistics with caching - user-specific"""
     try:
-        total_txns = Transaction.objects.count()
+        # Get current user from request (set by auth_bearer)
+        current_user = request.auth if isinstance(request.auth, User) else None
+        if not current_user:
+            return JsonResponse({"error": "Authentication required"}, status=401)
+        
+        # Filter transactions by user
+        user_transactions = Transaction.objects.filter(user=current_user)
+        total_txns = user_transactions.count()
 
-        aggregation = Transaction.objects.aggregate(
+        aggregation = user_transactions.aggregate(
             total_amount=Sum('amount'),
             fraud_count=Count('pk', filter=Q(is_fraud=True)),
             pending_count=Count('pk', filter=Q(status='pending'))
@@ -49,14 +64,19 @@ def stats(request):
         }
     except Exception as e:
         logger.error(f"Error fetching stats: {str(e)}")
-        return {"error": "Failed to fetch statistics"}, 500
+        return JsonResponse({"error": "Failed to fetch statistics"}, status=500)
 
 
 @router.get("/dashboard/transactions", auth=auth_bearer)
 @ratelimit(key='user', rate='100/m', method='GET')
 def transactions(request, page: int = 1, page_size: int = 10, status_filter: str = None):
-    """Returns paginated transactions with optional filtering"""
+    """Returns paginated transactions with optional filtering - user-specific"""
     try:
+        # Get current user from request
+        current_user = request.auth if isinstance(request.auth, User) else None
+        if not current_user:
+            return JsonResponse({"error": "Authentication required"}, status=401)
+        
         # Validate pagination parameters
         page = max(1, page)
         page_size = min(max(1, page_size), 100)  # Max 100 items per page
@@ -64,8 +84,8 @@ def transactions(request, page: int = 1, page_size: int = 10, status_filter: str
         offset = (page - 1) * page_size
         limit = page_size
 
-        # Build query
-        query = Transaction.objects.all()
+        # Build query - filter by user
+        query = Transaction.objects.filter(user=current_user)
         
         # Apply filters
         if status_filter and status_filter in ['pending', 'approved', 'rejected']:
@@ -97,28 +117,35 @@ def transactions(request, page: int = 1, page_size: int = 10, status_filter: str
         }
     except Exception as e:
         logger.error(f"Error fetching transactions: {str(e)}")
-        return {"error": "Failed to fetch transactions"}, 500
+        return JsonResponse({"error": "Failed to fetch transactions"}, status=500)
 
 
 @router.get("/audit-log", auth=auth_bearer)
 @ratelimit(key='user', rate='50/m', method='GET')
 def audit_log(request, page: int = 1, page_size: int = 20):
-    """Returns paginated audit logs"""
+    """Returns paginated audit logs - user-specific"""
     try:
+        # Get current user from request
+        current_user = request.auth if isinstance(request.auth, User) else None
+        if not current_user:
+            return JsonResponse({"error": "Authentication required"}, status=401)
+        
         page = max(1, page)
         page_size = min(max(1, page_size), 100)
         
         offset = (page - 1) * page_size
         limit = page_size
 
-        total_count = AuditLog.objects.count()
-        logs = AuditLog.objects.all().order_by('-timestamp')[offset:offset + limit]
+        # Filter audit logs by user
+        user_logs = AuditLog.objects.filter(user=current_user)
+        total_count = user_logs.count()
+        logs = user_logs.order_by('-timestamp')[offset:offset + limit]
 
         log_list = [{
             "action": log.action,
             "transaction_id": log.transaction_id,
             "details": log.details,
-            "user": log.user,
+            "user": log.user.email if log.user else (log.user_string or "SYSTEM"),  # Use email or fallback to user_string
             "timestamp": log.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
         } for log in logs]
 
@@ -130,69 +157,105 @@ def audit_log(request, page: int = 1, page_size: int = 20):
         }
     except Exception as e:
         logger.error(f"Error fetching audit logs: {str(e)}")
-        return {"error": "Failed to fetch audit logs"}, 500
+        return JsonResponse({"error": "Failed to fetch audit logs"}, status=500)
 
 
 @router.post("/detect-fraud", auth=auth_bearer)
 @ratelimit(key='user', rate='10/m', method='POST')
 def detect_fraud(request):
     """
-    Optimized fraud detection with rate limiting
+    Optimized fraud detection with rate limiting - user-specific
     """
     try:
+        # Get current user from request
+        current_user = request.auth if isinstance(request.auth, User) else None
+        if not current_user:
+            return JsonResponse({"error": "Authentication required"}, status=401)
+        
         start_time = timezone.now()
         HIGH_RISK_AMOUNT = Decimal('5000.00')
         HIGH_SCORE = Decimal('0.5')
 
+        # Get all pending transactions for this user (including those that haven't been processed yet)
         transactions_to_process = Transaction.objects.filter(
-            Q(status='pending') | Q(status='review')
+            user=current_user
+        ).filter(
+            Q(status='pending') | Q(status='review') | Q(status__isnull=True)
         )
         processed_count = transactions_to_process.count()
 
-        # Bulk update high-risk transactions
+        logger.info(f"Found {processed_count} transactions to process for fraud detection (user: {current_user.email})")
+
+        if processed_count == 0:
+            # Check if there are any transactions at all for this user
+            total_txns = Transaction.objects.filter(user=current_user).count()
+            logger.warning(f"No pending transactions found for user {current_user.email}. Total transactions: {total_txns}")
+            return {
+                "status": "success",
+                "message": f"No pending transactions to process. Total transactions: {total_txns}",
+                "transactions_processed": 0,
+                "fraud_detected": 0,
+                "duration_seconds": 0
+            }
+
+        # Bulk update high-risk transactions (amount >= $5000)
         high_risk_txns = transactions_to_process.filter(amount__gte=HIGH_RISK_AMOUNT)
         fraud_count = high_risk_txns.count()
 
-        high_risk_txns.update(
-            is_fraud=True,
-            fraud_score=HIGH_SCORE,
-            risk_score=Decimal('80.0'),
-            fraud_reasons='High transaction amount (>= $5000).',
-            reason_code='R1: High Amount',
-            status='rejected'
-        )
+        if fraud_count > 0:
+            high_risk_txns.update(
+                is_fraud=True,
+                fraud_score=HIGH_SCORE,
+                risk_score=Decimal('80.0'),
+                fraud_reasons='High transaction amount (>= $5000).',
+                reason_code='R1: High Amount',
+                status='rejected'
+            )
 
-        # Approve remaining transactions
-        transactions_to_approve = transactions_to_process.exclude(is_fraud=True)
-        transactions_to_approve.update(
-            is_fraud=False,
-            fraud_score=Decimal('0.0'),
-            risk_score=Decimal('10.0'),
-            fraud_reasons='',
-            reason_code='',
-            status='approved'
+        # Approve remaining transactions (those not flagged as fraud)
+        transactions_to_approve = transactions_to_process.exclude(
+            id__in=high_risk_txns.values_list('id', flat=True)
         )
+        approved_count = transactions_to_approve.count()
+        
+        if approved_count > 0:
+            transactions_to_approve.update(
+                is_fraud=False,
+                fraud_score=Decimal('0.0'),
+                risk_score=Decimal('10.0'),
+                fraud_reasons='',
+                reason_code='',
+                status='approved'
+            )
 
         # Log the action
-        AuditLog.objects.create(
-            action="Fraud Detection Run (Bulk Optimized)",
-            details=f"Processed {processed_count} transactions. Detected {fraud_count} fraud attempts.",
-            user="SYSTEM",
-            ip_address=request.META.get('REMOTE_ADDR'),
-        )
+        try:
+            AuditLog.objects.create(
+                user=current_user,  # Associate audit log with user
+                action="Fraud Detection Run (Bulk Optimized)",
+                details=f"Processed {processed_count} transactions. Detected {fraud_count} fraud attempts. Approved {approved_count} transactions.",
+                user_string=current_user.email,  # Legacy field
+                ip_address=request.META.get('REMOTE_ADDR'),
+            )
+        except Exception as log_error:
+            logger.warning(f"Failed to create audit log: {log_error}")
 
         duration = (timezone.now() - start_time).total_seconds()
 
-        return {
+        response_data = {
             "status": "success",
-            "message": f"Detection complete. {processed_count} processed in {round(duration, 3)}s.",
+            "message": f"Detection complete. Processed {processed_count} transactions ({fraud_count} fraud, {approved_count} approved) in {round(duration, 3)}s.",
             "transactions_processed": processed_count,
             "fraud_detected": fraud_count,
+            "approved_count": approved_count,
             "duration_seconds": round(duration, 3)
         }
+        
+        logger.info(f"Fraud detection response: {response_data}")
+        return response_data
     except Exception as e:
         logger.error(f"Error in fraud detection: {str(e)}")
-        return {"error": "Fraud detection failed", "message": str(e)}, 500
+        return JsonResponse({"error": "Fraud detection failed", "message": str(e)}, status=500)
 
 
 
@@ -202,56 +265,170 @@ def detect_fraud(request):
 @ratelimit(key='user', rate='10/h', method='POST')
 def upload_file(request, file: UploadedFile = File(...)):
     """
-    Handles file upload with rate limiting
+    Handles file upload with rate limiting - user-specific
     """
     try:
+        # Get current user from request
+        current_user = request.auth if isinstance(request.auth, User) else None
+        if not current_user:
+            return JsonResponse({"error": "Authentication required"}, status=401)
+        
         file_name = file.name
         file_data = file.read()
 
-        df = pd.read_csv(io.BytesIO(file_data))
+        # Read CSV without automatic type conversion to preserve original values
+        df = pd.read_csv(io.BytesIO(file_data), dtype=str, keep_default_na=False)
         initial_rows = len(df)
 
         # Clean column names
         df.columns = [col.lower().strip().replace(' ', '_') for col in df.columns]
         df.rename(columns={'txn_id': 'transaction_id', 'txn_date': 'date'}, inplace=True)
+        
+        # Log column names for debugging
+        logger.info(f"CSV columns detected: {list(df.columns)}")
+        if len(df) > 0:
+            logger.info(f"First row sample: {df.iloc[0].to_dict()}")
 
         # Prepare bulk insert
         transactions_to_create = []
+        logger.info(f"Processing {initial_rows} rows from CSV file: {file_name}")
+        
         for index, row in df.iterrows():
             try:
-                date_val = pd.to_datetime(row.get('date'), errors='coerce').to_pydatetime()
-                if pd.isna(date_val):
+                if 'date' in df.columns:
+                    date_raw = row['date']
+                    if date_raw and str(date_raw).strip():
+                        date_val = pd.to_datetime(date_raw, errors='coerce').to_pydatetime()
+                        if pd.isna(date_val):
+                            date_val = timezone.now()
+                    else:
+                        date_val = timezone.now()
+                else:
                     date_val = timezone.now()
-            except Exception:
+            except (KeyError, AttributeError, TypeError):
                 date_val = timezone.now()
+
+            # Parse amount - handle various formats
+            amount_val = Decimal('0.00')
+            try:
+                if 'amount' in df.columns:
+                    amount_raw = row['amount']
+                    # Since we read as string, check if it's not empty
+                    if amount_raw and str(amount_raw).strip():
+                        # Remove currency symbols, commas, and whitespace
+                        amount_str = str(amount_raw).replace('$', '').replace(',', '').strip()
+                        # Remove all whitespace
+                        amount_str = ''.join(amount_str.split())
+                        if amount_str:
+                            try:
+                                amount_val = Decimal(str(float(amount_str)))
+                            except (ValueError, TypeError, OverflowError):
+                                logger.warning(f"Could not convert amount '{amount_str}' to number for row {index}")
+                                amount_val = Decimal('0.00')
+                else:
+                    logger.warning(f"'amount' column not found in CSV")
+            except (ValueError, TypeError, AttributeError, KeyError) as e:
+                logger.warning(f"Could not parse amount for row {index}: {e}")
+                amount_val = Decimal('0.00')
+
+            # Parse merchant - handle various column names
+            merchant_val = 'Unknown Merchant'
+            try:
+                # Try different possible column names
+                merchant_raw = None
+                for col_name in ['merchant', 'description', 'merchant_name', 'vendor', 'store']:
+                    if col_name in df.columns:
+                        raw_value = row[col_name]
+                        # Since we read as string, just check if it's not empty
+                        if raw_value and str(raw_value).strip():
+                            merchant_str = str(raw_value).strip()
+                            if merchant_str.lower() not in ['nan', 'none', 'null', '']:
+                                merchant_raw = merchant_str
+                                break
+                
+                if merchant_raw:
+                    merchant_val = merchant_raw[:200]  # Limit to 200 chars
+            except (KeyError, AttributeError, TypeError) as e:
+                logger.warning(f"Could not parse merchant for row {index}: {e}")
+
+            # Parse transaction_id
+            # Generate a unique ID that includes timestamp and row index to ensure uniqueness
+            base_timestamp = timezone.now().timestamp()
+            transaction_id = f"AUTO-{base_timestamp}-{index}-{current_user.id}"
+            try:
+                if 'transaction_id' in df.columns:
+                    txn_id_raw = row['transaction_id']
+                    if txn_id_raw and str(txn_id_raw).strip():
+                        # Use CSV transaction_id but append user ID to make it user-specific
+                        csv_txn_id = str(txn_id_raw).strip()[:80]  # Leave room for user suffix
+                        transaction_id = f"{csv_txn_id}-U{current_user.id}"
+            except (KeyError, AttributeError, TypeError):
+                pass
+            
+            logger.debug(f"Row {index}: transaction_id={transaction_id}, amount={amount_val}, merchant={merchant_val}")
+
+            # Parse card_number
+            card_number = 'N/A'
+            try:
+                for col_name in ['card_number', 'card', 'card_num', 'card_id']:
+                    if col_name in df.columns:
+                        card_raw = row[col_name]
+                        if pd.notna(card_raw) and str(card_raw).strip() and str(card_raw).lower() != 'nan':
+                            card_number = str(card_raw).strip()[:20]
+                            break
+            except (KeyError, AttributeError, TypeError):
+                pass
 
             transactions_to_create.append(
                 Transaction(
-                    transaction_id=row.get('transaction_id', f"AUTO-{timezone.now().timestamp()}-{index}"),
-                    amount=row.get('amount', 0),
+                    user=current_user,  # Associate transaction with current user
+                    transaction_id=transaction_id,
+                    amount=amount_val,
                     date=date_val,
-                    merchant=row.get('merchant', 'Unknown Merchant'),
-                    card_number=str(row.get('card_number', 'N/A')),
+                    merchant=merchant_val,
+                    card_number=card_number,
+                    status='pending',  # Explicitly set status to pending
+                    is_fraud=False,
                 )
             )
+        
+        logger.info(f"Created {len(transactions_to_create)} transaction objects from CSV")
 
-        # Bulk insert
-        existing_ids = Transaction.objects.filter(
-            transaction_id__in=[t.transaction_id for t in transactions_to_create]
+        # Bulk insert - check for duplicates within user's transactions
+        # Get list of transaction IDs to check
+        transaction_ids_to_check = [t.transaction_id for t in transactions_to_create]
+        
+        # Query existing transactions for this user with these IDs
+        existing_ids = set(
+            Transaction.objects.filter(
+                user=current_user,
+                transaction_id__in=transaction_ids_to_check
         ).values_list('transaction_id', flat=True)
+        )
 
+        # Filter out duplicates
         new_transactions = [
             t for t in transactions_to_create if t.transaction_id not in existing_ids
         ]
 
-        Transaction.objects.bulk_create(new_transactions, ignore_conflicts=True)
-        new_rows_added = len(new_transactions)
+        # Log for debugging
+        logger.info(f"Total transactions to create: {len(transactions_to_create)}")
+        logger.info(f"Existing transaction IDs found: {len(existing_ids)}")
+        logger.info(f"New transactions to insert: {len(new_transactions)}")
+
+        if new_transactions:
+            Transaction.objects.bulk_create(new_transactions, ignore_conflicts=True)
+            new_rows_added = len(new_transactions)
+        else:
+            new_rows_added = 0
+            logger.warning(f"No new transactions to insert. All {len(transactions_to_create)} transactions already exist for user {current_user.email}")
 
         # Log success
         AuditLog.objects.create(
+            user=current_user,  # Associate audit log with user
             action=f"File Upload Success: {file_name}",
             details=f"Successfully uploaded {new_rows_added} new transaction records.",
-            user="SYSTEM/User",
+            user_string=current_user.email if current_user else "SYSTEM",
             ip_address=request.META.get('REMOTE_ADDR'),
         )
 
@@ -266,16 +443,18 @@ def upload_file(request, file: UploadedFile = File(...)):
         
         # Log failure
         try:
+            # current_user is defined at the start of the function, so it should be available
             AuditLog.objects.create(
+                user=current_user,
                 action=f"Upload Failed: {file_name}",
                 details=str(e),
-                user="SYSTEM/User",
+                user_string=current_user.email if current_user else "SYSTEM",
                 ip_address=request.META.get('REMOTE_ADDR'),
             )
         except Exception:
             pass
 
-        return {"error": f"Upload failed: {str(e)}"}, 500
+        return JsonResponse({"error": f"Upload failed: {str(e)}"}, status=500)
 
 
 # ==========================================
@@ -291,8 +470,18 @@ from plaid.model.products import Products
 from plaid.model.country_code import CountryCode
 from django.conf import settings
 import datetime
+from api.schemas import PlaidExchangeRequest
+from api.reports import generate_csv_report, generate_pdf_report
+from api.cleansing import cleanse_data
 
 def get_plaid_client():
+    """Get Plaid client, raising an error if credentials are missing"""
+    if not settings.PLAID_CLIENT_ID or not settings.PLAID_SECRET:
+        raise ValueError(
+            "Plaid credentials not configured. Please set PLAID_CLIENT_ID and PLAID_SECRET environment variables. "
+            "Get your keys from https://dashboard.plaid.com/"
+        )
+    
     configuration = plaid.Configuration(
         host=plaid.Environment.Sandbox if settings.PLAID_ENV == 'sandbox' else plaid.Environment.Development,
         api_key={
@@ -313,31 +502,51 @@ def create_link_token(request):
             country_codes=[CountryCode('US')],
             language='en',
             user=LinkTokenCreateRequestUser(
-                client_user_id=str(request.user.id if request.user.is_authenticated else 'guest_user')
+                client_user_id=str(request.user.id if hasattr(request, 'user') and request.user.is_authenticated else 'guest_user')
             )
         )
         response = client.link_token_create(request_data)
         return {"link_token": response['link_token']}
+    except ValueError as e:
+        # Missing credentials
+        logger.error(f"Plaid Configuration Error: {str(e)}")
+        return JsonResponse({"error": str(e), "type": "configuration"}, status=500)
     except Exception as e:
         logger.error(f"Plaid Link Token Error: {str(e)}")
-        return {"error": str(e)}, 500
+        return JsonResponse({"error": f"Failed to create Plaid link token: {str(e)}", "type": "api_error"}, status=500)
 
 @router.post("/plaid/exchange_public_token", auth=auth_bearer)
-def exchange_public_token(request, public_token: str):
+def exchange_public_token(request, payload: PlaidExchangeRequest):
+    """
+    Exchange Plaid public token for access token
+    Expects JSON body: {"public_token": "..."}
+    """
     try:
+        if not payload.public_token:
+            return {"error": "public_token is required"}, 400
+        
         client = get_plaid_client()
         exchange_request = ItemPublicTokenExchangeRequest(
-            public_token=public_token
+            public_token=payload.public_token
         )
         response = client.item_public_token_exchange(exchange_request)
         return {"access_token": response['access_token']}
+    except ValueError as e:
+        # Missing credentials
+        logger.error(f"Plaid Configuration Error: {str(e)}")
+        return JsonResponse({"error": str(e), "type": "configuration"}, status=500)
     except Exception as e:
         logger.error(f"Plaid Exchange Error: {str(e)}")
-        return {"error": str(e)}, 500
+        return JsonResponse({"error": f"Failed to exchange token: {str(e)}", "type": "api_error"}, status=500)
 
 @router.get("/plaid/transactions", auth=auth_bearer)
 def get_plaid_transactions(request, access_token: str):
     try:
+        # Get current user from request
+        current_user = request.auth if isinstance(request.auth, User) else None
+        if not current_user:
+            return JsonResponse({"error": "Authentication required"}, status=401)
+        
         client = get_plaid_client()
         start_date = (datetime.datetime.now() - datetime.timedelta(days=30)).date()
         end_date = datetime.datetime.now().date()
@@ -350,12 +559,13 @@ def get_plaid_transactions(request, access_token: str):
         response = client.transactions_get(request_data)
         transactions = response['transactions']
         
-        # Convert to our format and save
+        # Convert to our format and save - associate with user
         saved_count = 0
         txns_to_create = []
         
         for t in transactions:
             txns_to_create.append(Transaction(
+                user=current_user,  # Associate transaction with current user
                 transaction_id=t['transaction_id'],
                 amount=Decimal(str(t['amount'])),
                 date=t['date'],
@@ -373,4 +583,621 @@ def get_plaid_transactions(request, access_token: str):
         }
     except Exception as e:
         logger.error(f"Plaid Transactions Error: {str(e)}")
-        return {"error": str(e)}, 500
+        return JsonResponse({"error": str(e)}, status=500)
+
+
+# EXPORT REPORTS
+# ==========================================
+@router.get("/export/{type}", auth=None)  # We'll handle auth manually to support query string token
+def export_report(request, type: str):
+    """
+    Generates and returns a report (CSV or PDF) of all transactions - user-specific.
+    Supports both Authorization header and token query parameter for browser downloads.
+    """
+    try:
+        # Try to get user from multiple sources
+        current_user = None
+        
+        # 1. Try Authorization header first
+        auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+        if auth_header.startswith('Bearer '):
+            token = auth_header.split(' ')[1]
+            from api.jwt_auth import verify_token
+            payload = verify_token(token, token_type="access")
+            if payload:
+                user_id = payload.get("sub")
+                current_user = User.objects.filter(id=user_id, is_active=True).first()
+                if current_user:
+                    logger.info(f"Export authenticated via Authorization header for user: {current_user.email}")
+        
+        # 2. Try token query parameter (for browser downloads with token in URL)
+        if not current_user:
+            token = request.GET.get('token')
+            if token:
+                from api.jwt_auth import verify_token
+                payload = verify_token(token, token_type="access")
+                if payload:
+                    user_id = payload.get("sub")
+                    current_user = User.objects.filter(id=user_id, is_active=True).first()
+                    if current_user:
+                        logger.info(f"Export authenticated via JWT query token for user: {current_user.email}")
+        
+        # 3. Try httpOnly cookie (access_token cookie)
+        if not current_user:
+            token = request.COOKIES.get('access_token')
+            if token:
+                from api.jwt_auth import verify_token
+                payload = verify_token(token, token_type="access")
+                if payload:
+                    user_id = payload.get("sub")
+                    current_user = User.objects.filter(id=user_id, is_active=True).first()
+                    if current_user:
+                        logger.info(f"Export authenticated via httpOnly cookie for user: {current_user.email}")
+        
+        if not current_user:
+            return JsonResponse({"error": "Authentication required. Please log in to export reports."}, status=401)
+        
+        # Filter transactions by user
+        user_transactions = Transaction.objects.filter(user=current_user)
+        
+        if type == 'csv':
+            response = HttpResponse(content_type='text/csv; charset=utf-8')
+            response['Content-Disposition'] = 'attachment; filename="transactions_report.csv"'
+            
+            writer = csv.writer(response)
+            # Write header
+            writer.writerow(['Transaction ID', 'Date', 'Merchant', 'Amount', 'Status', 'Risk Score', 'Fraud Score', 'Is Fraud', 'Country', 'Currency'])
+            
+            # Write transaction data - only user's transactions
+            for txn in user_transactions.order_by('-date'):
+                writer.writerow([
+                    txn.transaction_id or '',
+                    txn.date.strftime('%Y-%m-%d %H:%M:%S') if txn.date else '',
+                    txn.merchant or 'Unknown',
+                    float(txn.amount) if txn.amount else 0.0,
+                    txn.status or 'pending',
+                    float(txn.risk_score) if txn.risk_score else 0.0,
+                    float(txn.fraud_score) if txn.fraud_score else 0.0,
+                    'YES' if txn.is_fraud else 'NO',
+                    txn.country or 'US',
+                    txn.currency or 'USD',
+                ])
+            
+            # Log the export
+            AuditLog.objects.create(
+                user=current_user,
+                action="CSV Report Exported",
+                details=f"CSV report downloaded with {user_transactions.count()} transactions",
+                user_string=current_user.email,
+                ip_address=request.META.get('REMOTE_ADDR'),
+            )
+            
+            return response
+
+        elif type == 'pdf':
+            try:
+                from reportlab.pdfgen import canvas
+                from reportlab.lib.pagesizes import letter
+                from reportlab.lib.units import inch
+            except ImportError:
+                logger.error("reportlab not installed. Cannot generate PDF.")
+                return JsonResponse({"error": "PDF generation requires reportlab library"}, status=500)
+
+            response = HttpResponse(content_type='application/pdf')
+            response['Content-Disposition'] = 'attachment; filename="transactions_report.pdf"'
+            
+            p = canvas.Canvas(response, pagesize=letter)
+            width, height = letter
+            
+            # Title
+            p.setFont("Helvetica-Bold", 16)
+            p.drawString(100, height - 50, "SecurePath Fraud Detection Report")
+            
+            # Report info - user-specific
+            p.setFont("Helvetica", 12)
+            total_txns = user_transactions.count()
+            fraud_count = user_transactions.filter(is_fraud=True).count()
+            pending_count = user_transactions.filter(status='pending').count()
+            
+            y_pos = height - 100
+            p.drawString(100, y_pos, f"Report Generated: {timezone.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            y_pos -= 20
+            p.drawString(100, y_pos, f"Total Transactions: {total_txns}")
+            y_pos -= 20
+            p.drawString(100, y_pos, f"Fraud Detected: {fraud_count}")
+            y_pos -= 20
+            p.drawString(100, y_pos, f"Pending Review: {pending_count}")
+            
+            # Transaction list (first 30 transactions)
+            y_pos -= 40
+            p.setFont("Helvetica-Bold", 10)
+            p.drawString(100, y_pos, "Recent Transactions:")
+            y_pos -= 20
+            
+            p.setFont("Helvetica", 8)
+            for txn in user_transactions.order_by('-date')[:30]:
+                if y_pos < 50:  # Start new page if needed
+                    p.showPage()
+                    y_pos = height - 50
+                
+                line = f"{txn.transaction_id[:15]:15} | {txn.merchant[:20]:20} | ${float(txn.amount):.2f} | {txn.status}"
+                p.drawString(100, y_pos, line)
+                y_pos -= 15
+            
+            p.showPage()
+            p.save()
+            
+            # Log the export
+            AuditLog.objects.create(
+                user=current_user,
+                action="PDF Report Exported",
+                details=f"PDF report downloaded with {total_txns} transactions",
+                user_string=current_user.email,
+                ip_address=request.META.get('REMOTE_ADDR'),
+            )
+            
+            return response
+
+        else:
+            return {"error": f"Unsupported export type: {type}. Supported types: csv, pdf"}, 400
+            
+    except Exception as e:
+        logger.error(f"Export Error: {str(e)}")
+        return JsonResponse({"error": f"Failed to generate report: {str(e)}"}, status=500)
+
+
+# DATA CLEANSING
+# ==========================================
+@router.get("/cleansing/stats", auth=auth_bearer)
+def cleansing_stats(request):
+    """Get statistics about data cleansing - user-specific"""
+    try:
+        # Get current user from request
+        current_user = request.auth if isinstance(request.auth, User) else None
+        if not current_user:
+            return JsonResponse({"error": "Authentication required"}, status=401)
+        
+        # Filter transactions by user
+        user_transactions = Transaction.objects.filter(user=current_user)
+        total = user_transactions.count()
+        
+        # Count potential duplicates (same transaction_id) within user's transactions
+        from django.db.models import Count
+        duplicates = user_transactions.values('transaction_id').annotate(
+            count=Count('transaction_id')
+        ).filter(count__gt=1).count()
+        
+        # Get last cleansing time from audit log for this user
+        last_cleansing = AuditLog.objects.filter(
+            user=current_user,
+            action__icontains='cleansing'
+        ).order_by('-timestamp').first()
+        
+        return {
+            "total_transactions": total,
+            "duplicates_count": duplicates,
+            "last_cleansed": last_cleansing.timestamp.isoformat() if last_cleansing else None
+        }
+    except Exception as e:
+        logger.error(f"Cleansing stats error: {str(e)}")
+        return JsonResponse({"error": str(e)}, status=500)
+
+
+@router.post("/cleansing/run", auth=auth_bearer)
+@ratelimit(key='user', rate='5/h', method='POST')
+def run_cleansing(request):
+    """
+    ATC-02: Run data cleansing on all transactions - user-specific
+    - Remove duplicates
+    - Normalize data formats
+    - Update records in database
+    """
+    import time
+    start_time = time.time()
+    
+    try:
+        # Get current user from request
+        current_user = request.auth if isinstance(request.auth, User) else None
+        if not current_user:
+            return JsonResponse({"error": "Authentication required"}, status=401)
+        
+        # Get all transactions for this user
+        transactions = Transaction.objects.filter(user=current_user)
+        total_count = transactions.count()
+        
+        if total_count == 0:
+            return {
+                "message": "No transactions to cleanse",
+                "duplicates_removed": 0,
+                "records_normalized": 0,
+                "duration_seconds": 0
+            }
+        
+        # Step 1: Find and remove duplicates (within user's transactions)
+        from django.db.models import Count
+        duplicate_groups = transactions.values('transaction_id').annotate(
+            count=Count('transaction_id')
+        ).filter(count__gt=1)
+        
+        duplicates_removed = 0
+        for group in duplicate_groups:
+            txn_id = group['transaction_id']
+            # Keep the first one, delete the rest (only within user's transactions)
+            duplicates = transactions.filter(transaction_id=txn_id).order_by('created_at')
+            if duplicates.count() > 1:
+                # Delete all except the first
+                to_delete = duplicates[1:]
+                duplicates_removed += to_delete.count()
+                to_delete.delete()
+        
+        # Step 2: Normalize existing records (user's transactions only)
+        records_normalized = 0
+        updates = []
+        
+        for txn in transactions:
+            updated = False
+            
+            # Normalize country code
+            if txn.country:
+                normalized_country = str(txn.country).upper().strip()[:2]
+                if normalized_country != txn.country:
+                    txn.country = normalized_country
+                    updated = True
+            
+            # Normalize currency code
+            if txn.currency:
+                normalized_currency = str(txn.currency).upper().strip()[:3]
+                if normalized_currency != txn.currency:
+                    txn.currency = normalized_currency
+                    updated = True
+            
+            # Normalize amount (round to 2 decimals)
+            if txn.amount:
+                try:
+                    normalized_amount = Decimal(str(txn.amount)).quantize(Decimal('0.01'))
+                    if normalized_amount != txn.amount:
+                        txn.amount = normalized_amount
+                        updated = True
+                except:
+                    pass
+            
+            # Normalize merchant (trim whitespace)
+            if txn.merchant:
+                normalized_merchant = str(txn.merchant).strip()[:200]
+                if normalized_merchant != txn.merchant:
+                    txn.merchant = normalized_merchant
+                    updated = True
+            
+            if updated:
+                updates.append(txn)
+                records_normalized += 1
+        
+        # Bulk update normalized records
+        if updates:
+            Transaction.objects.bulk_update(updates, ['country', 'currency', 'amount', 'merchant'])
+        
+        duration = time.time() - start_time
+        
+        # Log the action
+        AuditLog.objects.create(
+            user=current_user,
+            action="Data Cleansing Run (ATC-02)",
+            details=f"Processed {total_count} transactions. Removed {duplicates_removed} duplicates. Normalized {records_normalized} records.",
+            user_string=current_user.email,
+            ip_address=request.META.get('REMOTE_ADDR'),
+        )
+        
+        return {
+            "message": f"Data cleansing completed successfully. Removed {duplicates_removed} duplicates and normalized {records_normalized} records.",
+            "duplicates_removed": duplicates_removed,
+            "records_normalized": records_normalized,
+            "total_processed": total_count,
+            "duration_seconds": round(duration, 2)
+        }
+        
+    except Exception as e:
+        logger.error(f"Cleansing error: {str(e)}")
+        
+        # Log failure
+        try:
+            # current_user is defined at the start of the function, so it should be available
+            AuditLog.objects.create(
+                user=current_user,
+                action="Data Cleansing Failed",
+                details=str(e),
+                user_string=current_user.email if current_user else "SYSTEM",
+                ip_address=request.META.get('REMOTE_ADDR'),
+            )
+        except:
+            pass
+        
+        return JsonResponse({"error": f"Data cleansing failed: {str(e)}"}, status=500)
+
+
+# AUTHENTICATION ROUTES
+# ==========================================
+from api.schemas import UserRegister, UserLogin, UserResponse, TokenResponse
+from django.http import HttpResponse
+from datetime import timedelta
+
+@router.post("/auth/register", auth=None)
+def register(request, user_data: UserRegister):
+    """
+    Register a new user account
+    - Validates email format
+    - Checks password match
+    - Hashes password securely
+    - Creates user account
+    - Returns JWT tokens
+    """
+    try:
+        # Validate password match
+        if user_data.password != user_data.confirm_password:
+            return JsonResponse({"error": "Passwords do not match"}, status=400)
+        
+        # Validate password length (bcrypt has 72 byte limit)
+        if len(user_data.password.encode('utf-8')) > 72:
+            return JsonResponse({"error": "Password cannot be longer than 72 characters"}, status=400)
+        
+        # Check if user already exists
+        if User.objects.filter(email=user_data.email).exists():
+            return JsonResponse({"error": "Email already registered"}, status=400)
+        
+        # Create new user
+        hashed_password = get_password_hash(user_data.password)
+        new_user = User.objects.create(
+            email=user_data.email,
+            hashed_password=hashed_password
+        )
+        
+        # Create tokens
+        token_data = {"sub": new_user.id, "email": new_user.email}
+        access_token = create_access_token(token_data)
+        refresh_token_str = create_refresh_token(token_data)
+        
+        # Save refresh token to database
+        from datetime import datetime
+        refresh_token_expires = timezone.now() + timedelta(days=7)
+        RefreshToken.objects.create(
+            token=refresh_token_str,
+            user=new_user,
+            expires_at=refresh_token_expires
+        )
+        
+        # Return response data - Django Ninja will serialize dict to JSON
+        # For cookies, we need to use HttpResponse directly
+        response_data = {
+            "access_token": access_token,
+            "refresh_token": refresh_token_str,
+            "token_type": "bearer",
+            "user": {
+                "id": new_user.id,
+                "email": new_user.email,
+                "is_active": new_user.is_active,
+                "created_at": new_user.created_at.isoformat()
+            }
+        }
+        
+        # Create HttpResponse with JSON content and cookies
+        response = JsonResponse(response_data)
+        response.set_cookie(
+            key="access_token",
+            value=access_token,
+            httponly=True,
+            secure=False,  # Set to True in production with HTTPS
+            samesite="lax",
+            max_age=30 * 60  # 30 minutes
+        )
+        response.set_cookie(
+            key="refresh_token",
+            value=refresh_token_str,
+            httponly=True,
+            secure=False,
+            samesite="lax",
+            max_age=7 * 24 * 60 * 60  # 7 days
+        )
+        
+        # Django Ninja accepts HttpResponse directly
+        return response
+        
+    except IntegrityError:
+        logger.warning(f"Registration attempt with existing email: {user_data.email}")
+        return JsonResponse({"error": "Email already registered"}, status=400)
+    except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        logger.error(f"Registration error: {str(e)}\n{error_trace}")
+        # Return proper JSON error response
+        return JsonResponse({"error": f"Registration failed: {str(e)}"}, status=500)
+
+
+@router.post("/auth/login", auth=None)
+def login(request, user_data: UserLogin):
+    """
+    Login with email and password
+    - Verifies email exists
+    - Verifies password
+    - Returns JWT tokens in httpOnly cookies
+    """
+    try:
+        # Find user by email
+        user = User.objects.filter(email=user_data.email).first()
+        
+        if not user:
+            return JsonResponse({"error": "Incorrect email or password"}, status=401)
+        
+        # Check if user has a password (OAuth-only users won't have one)
+        if not user.hashed_password:
+            return JsonResponse({"error": "Please sign in with your OAuth provider"}, status=401)
+        
+        # Verify password
+        if not verify_password(user_data.password, user.hashed_password):
+            return JsonResponse({"error": "Incorrect email or password"}, status=401)
+        
+        # Check if user is active
+        if not user.is_active:
+            return JsonResponse({"error": "User account is inactive"}, status=403)
+        
+        # Create tokens
+        token_data = {"sub": user.id, "email": user.email}
+        access_token = create_access_token(token_data)
+        refresh_token_str = create_refresh_token(token_data)
+        
+        # Revoke old refresh tokens and save new one
+        RefreshToken.objects.filter(user=user).update(is_revoked=True)
+        refresh_token_expires = timezone.now() + timedelta(days=7)
+        RefreshToken.objects.create(
+            token=refresh_token_str,
+            user=user,
+            expires_at=refresh_token_expires
+        )
+        
+        # Create response with cookies
+        response_data = {
+            "access_token": access_token,
+            "refresh_token": refresh_token_str,
+            "token_type": "bearer",
+            "user": {
+                "id": user.id,
+                "email": user.email,
+                "is_active": user.is_active,
+                "created_at": user.created_at.isoformat()
+            }
+        }
+        
+        response = JsonResponse(response_data)
+        response.set_cookie(
+            key="access_token",
+            value=access_token,
+            httponly=True,
+            secure=False,
+            samesite="lax",
+            max_age=30 * 60
+        )
+        response.set_cookie(
+            key="refresh_token",
+            value=refresh_token_str,
+            httponly=True,
+            secure=False,
+            samesite="lax",
+            max_age=7 * 24 * 60 * 60
+        )
+        
+        return response
+        
+    except Exception as e:
+        logger.error(f"Login error: {str(e)}")
+        return JsonResponse({"error": f"Login failed: {str(e)}"}, status=500)
+
+
+@router.post("/auth/logout", auth=None)
+def logout(request):
+    """
+    Logout user - revoke refresh token and clear cookies
+    """
+    try:
+        refresh_token = request.COOKIES.get('refresh_token')
+        if refresh_token:
+            RefreshToken.objects.filter(token=refresh_token).update(is_revoked=True)
+        
+        response = JsonResponse({"message": "Logged out successfully"})
+        response.delete_cookie('access_token')
+        response.delete_cookie('refresh_token')
+        return response
+    except Exception as e:
+        logger.error(f"Logout error: {str(e)}")
+        return JsonResponse({"error": "Logout failed"}, status=500)
+
+
+@router.get("/auth/me", auth=auth_bearer)
+def get_current_user_info(request):
+    """
+    Get current authenticated user's information
+    - Requires valid JWT token in Authorization header
+    """
+    try:
+        # Get token from Authorization header
+        auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+        if not auth_header.startswith('Bearer '):
+            return JsonResponse({"error": "Invalid authorization header"}, status=401)
+        
+        token = auth_header.split(' ')[1]
+        payload = verify_token(token, token_type="access")
+        
+        if not payload:
+            return {"error": "Invalid or expired token"}, 401
+        
+        user_id = payload.get("sub")
+        user = User.objects.filter(id=user_id, is_active=True).first()
+        
+        if not user:
+            return {"error": "User not found"}, 404
+        
+        return {
+            "id": user.id,
+            "email": user.email,
+            "is_active": user.is_active,
+            "created_at": user.created_at.isoformat()
+        }
+    except Exception as e:
+        import traceback
+        logger.error(f"Get user error: {str(e)}\n{traceback.format_exc()}")
+        return JsonResponse({"error": "Failed to get user info"}, status=500)
+
+
+@router.post("/auth/refresh", auth=None)
+def refresh_access_token(request):
+    """
+    Refresh access token using refresh token
+    """
+    try:
+        refresh_token = request.COOKIES.get('refresh_token')
+        if not refresh_token:
+            return JsonResponse({"error": "Refresh token required"}, status=401)
+        
+        # Verify refresh token
+        payload = verify_token(refresh_token, token_type="refresh")
+        if not payload:
+            return JsonResponse({"error": "Invalid refresh token"}, status=401)
+        
+        # Check if token exists in database and is not revoked
+        token_record = RefreshToken.objects.filter(
+            token=refresh_token,
+            is_revoked=False,
+            expires_at__gt=timezone.now()
+        ).first()
+        
+        if not token_record:
+            return JsonResponse({"error": "Refresh token not found or expired"}, status=401)
+        
+        user = token_record.user
+        if not user.is_active:
+            return JsonResponse({"error": "User account is inactive"}, status=403)
+        
+        # Create new access token
+        token_data = {"sub": user.id, "email": user.email}
+        access_token = create_access_token(token_data)
+        
+        # Update cookie
+        response = JsonResponse({
+            "access_token": access_token,
+            "token_type": "bearer"
+        })
+        response.set_cookie(
+            key="access_token",
+            value=access_token,
+            httponly=True,
+            secure=False,
+            samesite="lax",
+            max_age=30 * 60
+        )
+        
+        return response
+        
+    except Exception as e:
+        import traceback
+        logger.error(f"Refresh token error: {str(e)}\n{traceback.format_exc()}")
+        return JsonResponse({"error": "Failed to refresh token"}, status=500)
+
+
+# OAuth routes removed - using simple email/password authentication only

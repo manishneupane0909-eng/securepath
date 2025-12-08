@@ -1,4 +1,5 @@
 import { API_CONFIG } from '../config/constants';
+import authService from './authService';
 
 class APIError extends Error {
     constructor(message, status, data) {
@@ -12,10 +13,15 @@ class APIError extends Error {
 const apiCall = async (endpoint, options = {}) => {
     const url = `${API_CONFIG.BASE_URL}${endpoint}`;
 
+    // Get access token from localStorage (fallback) or use httpOnly cookies
+    const accessToken = authService.getAccessToken();
+
     const config = {
         ...options,
+        credentials: 'include', // Important for httpOnly cookies
         headers: {
-            'Authorization': `Bearer ${API_CONFIG.AUTH_TOKEN}`,
+            'Content-Type': 'application/json',
+            ...(accessToken && { 'Authorization': `Bearer ${accessToken}` }),
             ...options.headers,
         },
     };
@@ -67,10 +73,12 @@ export const apiService = {
         const formData = new FormData();
         formData.append('file', file);
 
+        const accessToken = authService.getAccessToken();
         return fetch(`${API_CONFIG.BASE_URL}/upload`, {
             method: 'POST',
+            credentials: 'include',
             headers: {
-                'Authorization': `Bearer ${API_CONFIG.AUTH_TOKEN}`,
+                ...(accessToken && { 'Authorization': `Bearer ${accessToken}` }),
             },
             body: formData,
         }).then(async (response) => {
@@ -93,15 +101,17 @@ export const apiService = {
     },
 
     async getExportUrl(type) {
-        return `${API_CONFIG.BASE_URL}/export/${type}?token=${API_CONFIG.AUTH_TOKEN}`;
+        // Return URL without token - authentication will be handled via httpOnly cookies
+        // The backend will check for the access_token cookie automatically
+        return `${API_CONFIG.BASE_URL}/export/${type}`;
     },
 
     async createLinkToken() {
-        return apiCall('/plaid/link-token');
+        return apiCall('/plaid/create_link_token', { method: 'POST' });
     },
 
     async exchangePublicToken(public_token) {
-        return apiCall('/plaid/exchange-token', {
+        return apiCall('/plaid/exchange_public_token', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -117,6 +127,9 @@ export const apiService = {
     async testEndpoint(endpoint, method = 'GET') {
         return apiCall(endpoint, { method });
     },
+
+    getCleansingStats: () => apiCall('/cleansing/stats'),
+    cleanseData: () => apiCall('/cleansing/run', { method: 'POST' }),
 };
 
 export default apiService;

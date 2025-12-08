@@ -15,6 +15,43 @@ const ICON_MAP = {
 };
 
 export default function Sidebar({ activeTab, setActiveTab, sidebarOpen, setSidebarOpen }) {
+    // Force include Data Cleansing - always show it
+    const navItems = React.useMemo(() => {
+        // Start with NAV_ITEMS from constants
+        let items = Array.isArray(NAV_ITEMS) ? [...NAV_ITEMS] : [];
+        
+        // Always ensure Data Cleansing is present at position 2 (after Upload)
+        const cleansingItem = { id: ROUTES.CLEANSING, label: 'Data Cleansing', color: 'cyan' };
+        const hasCleansing = items.some(item => item.id === ROUTES.CLEANSING || item.id === 'cleansing');
+        
+        if (!hasCleansing) {
+            // Insert after Upload (index 1)
+            items.splice(2, 0, cleansingItem);
+        } else {
+            // Make sure it's in the right position
+            const cleansingIndex = items.findIndex(item => item.id === ROUTES.CLEANSING || item.id === 'cleansing');
+            if (cleansingIndex !== 2 && cleansingIndex !== -1) {
+                // Remove and re-insert at correct position
+                items.splice(cleansingIndex, 1);
+                items.splice(2, 0, cleansingItem);
+            }
+        }
+        
+        return items;
+    }, []);
+    
+    // Debug: Log to console
+    React.useEffect(() => {
+        console.log('=== SIDEBAR DEBUG ===');
+        console.log('NAV_ITEMS from constants:', NAV_ITEMS);
+        console.log('NAV_ITEMS type:', typeof NAV_ITEMS, 'isArray:', Array.isArray(NAV_ITEMS));
+        console.log('ROUTES.CLEANSING:', ROUTES.CLEANSING);
+        console.log('Processed navItems:', navItems);
+        console.log('navItems length:', navItems.length);
+        console.log('Has cleansing?', navItems.some(item => item.id === ROUTES.CLEANSING || item.id === 'cleansing'));
+        console.log('===================');
+    }, [navItems]);
+    
     return (
         <aside
             className={`
@@ -38,8 +75,8 @@ export default function Sidebar({ activeTab, setActiveTab, sidebarOpen, setSideb
                 </div>
             </div>
 
-            <nav className="flex-1 py-6 px-3 space-y-2 overflow-y-auto custom-scrollbar">
-                {NAV_ITEMS.map((item) => {
+            <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto custom-scrollbar">
+                {navItems && navItems.length > 0 ? navItems.map((item) => {
                     const Icon = ICON_MAP[item.id] || Shield;
                     const isActive = activeTab === item.id;
 
@@ -48,7 +85,7 @@ export default function Sidebar({ activeTab, setActiveTab, sidebarOpen, setSideb
                             key={item.id}
                             onClick={() => setActiveTab(item.id)}
                             className={`
-                                w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-300 group relative overflow-hidden
+                                w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-all duration-300 group relative overflow-hidden
                                 ${isActive
                                     ? 'text-cyber-primary bg-cyber-primary/10 border border-cyber-primary/30 shadow-neon-cyan'
                                     : 'text-cyber-text-secondary hover:text-white hover:bg-white/5 border border-transparent'
@@ -73,7 +110,9 @@ export default function Sidebar({ activeTab, setActiveTab, sidebarOpen, setSideb
                             )}
                         </button>
                     );
-                })}
+                }) : (
+                    <div className="text-cyber-text-secondary text-sm p-4">No navigation items found</div>
+                )}
             </nav>
 
             <div className="p-4 border-t border-white/10">

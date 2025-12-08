@@ -36,6 +36,15 @@ gunicorn==21.2.0
 django-ratelimit==4.1.0
 django-environ==0.11.2
 
+# Authentication & JWT
+PyJWT==2.8.0
+passlib[bcrypt]==1.7.4
+python-jose[cryptography]==3.3.0
+authlib==1.2.1
+google-auth==2.23.4
+httpx==0.25.1
+email-validator==2.3.0
+
 # Testing
 pytest==7.4.3
 pytest-django==4.7.0

@@ -1,22 +1,28 @@
 import React, { useState } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from './contexts/AuthContext';
 import ErrorBoundary from './components/ErrorBoundary';
+import ProtectedRoute from './components/ProtectedRoute';
 import Sidebar from './components/Shared/Sidebar';
 import DashboardView from './components/Dashboard/DashboardView';
 import UploadView from './components/Upload/UploadView';
+import DataCleansingView from './components/DataCleansing/DataCleansingView';
 import RiskScoringView from './components/RiskScoring/RiskScoringView';
 import AuditLogView from './components/AuditLog/AuditLogView';
 import ReportsView from './components/Reports/ReportsView';
+import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
 import { useDashboardData } from './hooks/useDashboardData';
 import { NAV_ITEMS } from './config/constants';
-import { Droplets, TestTube } from 'lucide-react';
+import { useAuth } from './contexts/AuthContext';
+import { LogOut } from 'lucide-react';
 
-
-
-
-export default function SecurePathDashboard() {
+// Dashboard component (protected)
+function SecurePathDashboard() {
     const [activeTab, setActiveTab] = useState('dashboard');
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const { stats, transactions, loading, refresh } = useDashboardData();
+    const { user, logout } = useAuth();
 
     const renderContent = () => {
         switch (activeTab) {
@@ -24,6 +30,8 @@ export default function SecurePathDashboard() {
                 return <DashboardView stats={stats} transactions={transactions} loading={loading} onRefresh={refresh} />;
             case 'upload':
                 return <UploadView onSuccess={refresh} />;
+            case 'cleansing':
+                return <DataCleansingView onSuccess={refresh} />;
             case 'risk-scoring':
                 return <RiskScoringView onComplete={refresh} />;
             case 'audit-log':
@@ -36,6 +44,7 @@ export default function SecurePathDashboard() {
     };
 
     const currentNav = NAV_ITEMS.find(i => i.id === activeTab);
+    const userInitials = user?.email ? user.email.substring(0, 2).toUpperCase() : 'AD';
 
     return (
         <ErrorBoundary>
@@ -71,10 +80,23 @@ export default function SecurePathDashboard() {
                                 <div className="w-2 h-2 bg-cyber-success rounded-full animate-pulse shadow-[0_0_10px_#00FF94]"></div>
                                 <span className="text-sm font-bold text-cyber-success tracking-wide">SYSTEM ONLINE</span>
                             </div>
-                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyber-primary to-cyber-secondary p-[2px]">
-                                <div className="w-full h-full rounded-full bg-black flex items-center justify-center text-white font-bold text-sm">
-                                    AD
+                            <div className="flex items-center gap-3">
+                                <div className="text-right">
+                                    <p className="text-sm text-white font-medium">{user?.email || 'User'}</p>
+                                    <p className="text-xs text-cyber-text-secondary">Logged in</p>
                                 </div>
+                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyber-primary to-cyber-secondary p-[2px]">
+                                    <div className="w-full h-full rounded-full bg-black flex items-center justify-center text-white font-bold text-sm">
+                                        {userInitials}
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={logout}
+                                    className="p-2 rounded-lg hover:bg-white/10 transition-colors text-cyber-text-secondary hover:text-white"
+                                    title="Logout"
+                                >
+                                    <LogOut size={20} />
+                                </button>
                             </div>
                         </div>
                     </header>
@@ -85,5 +107,28 @@ export default function SecurePathDashboard() {
                 </main>
             </div>
         </ErrorBoundary>
+    );
+}
+
+// Main App component with routing
+export default function App() {
+    return (
+        <Router>
+            <AuthProvider>
+                <Routes>
+                    <Route path="/login" element={<LoginPage />} />
+                    <Route path="/register" element={<RegisterPage />} />
+                    <Route
+                        path="/dashboard"
+                        element={
+                            <ProtectedRoute>
+                                <SecurePathDashboard />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                </Routes>
+            </AuthProvider>
+        </Router>
     );
 }

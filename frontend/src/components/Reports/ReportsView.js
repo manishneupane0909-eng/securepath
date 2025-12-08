@@ -8,12 +8,36 @@ export default function ReportsView() {
 
     const downloadReport = async (type) => {
         setDownloading(type);
-        await new Promise(resolve => setTimeout(resolve, 500));
+        try {
+            // Get the export URL with JWT token
+            const url = await apiService.getExportUrl(type);
+            
+            // Use fetch to download the file with proper authentication
+            const response = await fetch(url, {
+                method: 'GET',
+                credentials: 'include', // Include httpOnly cookies
+            });
 
-        const url = apiService.getExportUrl(type);
-        window.open(url, '_blank');
+            if (!response.ok) {
+                throw new Error(`Export failed: ${response.statusText}`);
+            }
 
-        setTimeout(() => setDownloading(null), 2000);
+            // Get the blob and create a download link
+            const blob = await response.blob();
+            const downloadUrl = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.download = `transactions_report.${type}`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(downloadUrl);
+        } catch (error) {
+            console.error('Export error:', error);
+            alert(`Failed to download ${type.toUpperCase()} report: ${error.message}`);
+        } finally {
+            setDownloading(null);
+        }
     };
 
     return (

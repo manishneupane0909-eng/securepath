@@ -28,7 +28,7 @@ INSTALLED_APPS = [
 
     # Third-party apps
     'corsheaders',
-    'django_celery_results',  # NEW: For tracking task status
+    'django_celery_results',
 
     # Your apps
     'api',
@@ -138,6 +138,27 @@ CORS_ALLOW_HEADERS = [
 # =====================================================
 
 API_TOKEN = os.getenv('API_TOKEN', 'securepath2025')
+
+# =====================================================
+# JWT SETTINGS
+# =====================================================
+
+JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', 'your-secret-key-change-in-production-use-strong-random-key')
+JWT_ALGORITHM = os.getenv('JWT_ALGORITHM', 'HS256')
+JWT_ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv('JWT_ACCESS_TOKEN_EXPIRE_MINUTES', '30'))
+JWT_REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv('JWT_REFRESH_TOKEN_EXPIRE_DAYS', '7'))
+
+# =====================================================
+# OAUTH SETTINGS
+# =====================================================
+
+GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID', '')
+GOOGLE_CLIENT_SECRET = os.getenv('GOOGLE_CLIENT_SECRET', '')
+GOOGLE_REDIRECT_URI = os.getenv('GOOGLE_REDIRECT_URI', 'http://localhost:3000/oauth/callback/google')
+
+GITHUB_CLIENT_ID = os.getenv('GITHUB_CLIENT_ID', '')
+GITHUB_CLIENT_SECRET = os.getenv('GITHUB_CLIENT_SECRET', '')
+GITHUB_REDIRECT_URI = os.getenv('GITHUB_REDIRECT_URI', 'http://localhost:3000/oauth/callback/github')
 
 # =====================================================
 # FILE UPLOAD SETTINGS (Updated for 400 MB)

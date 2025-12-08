@@ -78,13 +78,23 @@ export default function DashboardView({ stats, transactions, loading, onRefresh 
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-white/5">
-                            {transactions.map((txn, i) => (
+                            {transactions && transactions.length > 0 ? transactions.map((txn, i) => {
+                                const amount = txn.amount !== null && txn.amount !== undefined 
+                                    ? (typeof txn.amount === 'number' ? txn.amount : parseFloat(txn.amount) || 0)
+                                    : 0;
+                                const merchant = txn.merchant || 'Unknown Merchant';
+                                
+                                return (
                                 <tr key={i} className="hover:bg-white/5 transition duration-200 group">
                                     <td className="px-6 py-4 text-sm font-mono text-cyber-primary/80 group-hover:text-cyber-primary transition-colors">
-                                        {txn.transaction_id}
+                                        {txn.transaction_id || 'N/A'}
                                     </td>
-                                    <td className="px-6 py-4 text-sm font-bold text-white tracking-wide">${txn.amount}</td>
-                                    <td className="px-6 py-4 text-sm text-cyber-text-primary">{txn.merchant}</td>
+                                    <td className="px-6 py-4 text-sm font-bold text-white tracking-wide">
+                                        ${amount.toFixed(2)}
+                                    </td>
+                                    <td className="px-6 py-4 text-sm text-cyber-text-primary">
+                                        {merchant}
+                                    </td>
                                     <td className="px-6 py-4">
                                         <span className={`px-3 py-1 text-xs font-bold rounded-full border ${txn.status === 'approved' ? 'bg-green-500/10 text-green-400 border-green-500/30' :
                                             txn.status === 'rejected' ? 'bg-red-500/10 text-red-400 border-red-500/30' :
@@ -111,7 +121,14 @@ export default function DashboardView({ stats, transactions, loading, onRefresh 
                                         }
                                     </td>
                                 </tr>
-                            ))}
+                                );
+                            }) : (
+                                <tr>
+                                    <td colSpan="6" className="px-6 py-8 text-center text-cyber-text-secondary">
+                                        No transactions found
+                                    </td>
+                                </tr>
+                            )}
                         </tbody>
                     </table>
                 </div>

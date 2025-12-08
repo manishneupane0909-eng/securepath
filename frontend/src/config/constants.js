@@ -27,6 +27,7 @@ export const ROUTES = {
 export const NAV_ITEMS = [
     { id: ROUTES.DASHBOARD, label: 'Dashboard', color: 'blue' },
     { id: ROUTES.UPLOAD, label: 'Upload', color: 'green' },
+    { id: ROUTES.CLEANSING, label: 'Data Cleansing', color: 'cyan' },
     { id: ROUTES.RISK_SCORING, label: 'Risk Scoring', color: 'orange' },
     { id: ROUTES.AUDIT_LOG, label: 'Audit Log', color: 'purple' },
     { id: ROUTES.REPORTS, label: 'Report Export', color: 'indigo' },

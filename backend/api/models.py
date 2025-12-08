@@ -1,9 +1,3 @@
-# api/models.py - COMPLETE VERSION
-"""
-LOCATION: securepath-backend/api/models.py
-Replace your entire models.py with this
-"""
-
 from django.db import models
 from django.utils import timezone
 
@@ -11,8 +5,12 @@ from django.utils import timezone
 class Transaction(models.Model):
     """Main transaction model with all required fields"""
 
+    # User relationship - each transaction belongs to a user
+    # Using string reference since User is defined later
+    user = models.ForeignKey('User', on_delete=models.CASCADE, related_name='transactions', null=True, blank=True)
+
     # Core transaction fields
-    transaction_id = models.CharField(max_length=100, unique=True, db_index=True)
+    transaction_id = models.CharField(max_length=100, db_index=True)
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     date = models.DateTimeField(db_index=True)
     merchant = models.CharField(max_length=200)
@@ -46,11 +44,13 @@ class Transaction(models.Model):
     class Meta:
         ordering = ['-date']
         indexes = [
-            models.Index(fields=['transaction_id']),
-            models.Index(fields=['date']),
-            models.Index(fields=['status']),
-            models.Index(fields=['is_fraud']),
+            models.Index(fields=['user', 'transaction_id']),
+            models.Index(fields=['user', 'date']),
+            models.Index(fields=['user', 'status']),
+            models.Index(fields=['user', 'is_fraud']),
         ]
+        # Unique constraint: transaction_id should be unique per user
+        unique_together = [['user', 'transaction_id']]
 
     def __str__(self):
         return f"{self.transaction_id} - ${self.amount} - {self.status}"
@@ -59,13 +59,17 @@ class Transaction(models.Model):
 class AuditLog(models.Model):
     """Audit log for tracking all system actions"""
 
+    # User relationship - each audit log belongs to a user
+    # Using string reference since User is defined later
+    user = models.ForeignKey('User', on_delete=models.CASCADE, related_name='audit_logs', null=True, blank=True)
+
     # Action details
     action = models.CharField(max_length=100, db_index=True)
     transaction_id = models.CharField(max_length=100, null=True, blank=True, db_index=True)
     details = models.TextField(null=True, blank=True)
 
-    # User context
-    user = models.CharField(max_length=100, null=True, blank=True)
+    # User context (legacy - keeping for backward compatibility)
+    user_string = models.CharField(max_length=100, null=True, blank=True)
     ip_address = models.GenericIPAddressField(null=True, blank=True)
     user_agent = models.TextField(null=True, blank=True)
 
@@ -75,9 +79,9 @@ class AuditLog(models.Model):
     class Meta:
         ordering = ['-timestamp']
         indexes = [
-            models.Index(fields=['action']),
-            models.Index(fields=['transaction_id']),
-            models.Index(fields=['timestamp']),
+            models.Index(fields=['user', 'action']),
+            models.Index(fields=['user', 'transaction_id']),
+            models.Index(fields=['user', 'timestamp']),
         ]
 
     def __str__(self):
@@ -108,3 +112,58 @@ class SystemMetrics(models.Model):
 
     def __str__(self):
         return f"Metrics - {self.timestamp.strftime('%Y-%m-%d %H:%M:%S')}"
+
+
+class User(models.Model):
+    """User model for authentication"""
+    email = models.EmailField(unique=True, db_index=True)
+    hashed_password = models.CharField(max_length=255, null=True, blank=True)  # Nullable for OAuth-only users
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.email
+
+
+class OAuthAccount(models.Model):
+    """OAuth account linking - connects OAuth providers to users"""
+    PROVIDER_CHOICES = [
+        ('google', 'Google'),
+        ('github', 'GitHub'),
+        ('apple', 'Apple'),
+    ]
+    
+    provider = models.CharField(max_length=20, choices=PROVIDER_CHOICES)
+    provider_user_id = models.CharField(max_length=255)  # User ID from OAuth provider
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='oauth_accounts')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = [['provider', 'provider_user_id']]
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.user.email} - {self.provider}"
+
+
+class RefreshToken(models.Model):
+    """Refresh token storage for JWT authentication"""
+    token = models.CharField(max_length=500, unique=True, db_index=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='refresh_tokens')
+    expires_at = models.DateTimeField()
+    is_revoked = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['token']),
+            models.Index(fields=['user', 'is_revoked']),
+        ]
+
+    def __str__(self):
+        return f"Refresh token for {self.user.email}"

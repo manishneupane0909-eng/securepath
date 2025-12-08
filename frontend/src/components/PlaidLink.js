@@ -12,11 +12,24 @@ export default function PlaidLink({ onSuccess }) {
     const initLink = async () => {
       try {
         const data = await apiService.createLinkToken();
-        setToken(data.link_token);
-        setStatus("ready");
+        if (data.link_token) {
+          setToken(data.link_token);
+          setStatus("ready");
+        } else {
+          throw new Error(data.error || "No link token received");
+        }
       } catch (err) {
         console.error("Failed to create link token:", err);
-        setError("Failed to initialize Plaid. Using cached mode.");
+        let errorMessage = "Failed to initialize Plaid.";
+        
+        // Check if it's a configuration error
+        if (err.data && err.data.type === "configuration") {
+          errorMessage = "Plaid credentials not configured. Please set PLAID_CLIENT_ID and PLAID_SECRET environment variables. Get your keys from https://dashboard.plaid.com/";
+        } else if (err.message) {
+          errorMessage = err.message;
+        }
+        
+        setError(errorMessage);
         setStatus("error");
       }
     };
