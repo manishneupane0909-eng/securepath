@@ -1,4 +1,6 @@
 # SecurePath
+<img width="1443" height="763" alt="Screenshot 2026-01-21 at 4 58 43 PM" src="https://github.com/user-attachments/assets/23e4f758-0023-492c-9ff7-c66966b0ec09" />
+
 
 Full-stack monorepo - This is the main repository containing both backend and frontend.
 
