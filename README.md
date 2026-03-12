@@ -144,4 +144,4 @@ securepath/
 
 ## About
 
-Built by [Manish Neupane](https://www.linkedin.com/in/manish-neupane-380a65189) as an academic capstone project at SDSU, bridging data science and full-stack web development. The project demonstrates end-to-end ML integration — from raw CSV ingestion through async processing to interactive risk visualization.
+Built by [Manish Neupane](https://www.linkedin.com/in/manish-neupane-380a65189) as an academic project at SDSU with 5 other team memebrs, bridging data science and full-stack web development. The project demonstrates end-to-end ML integration — from raw CSV ingestion through async processing to interactive risk visualization.
